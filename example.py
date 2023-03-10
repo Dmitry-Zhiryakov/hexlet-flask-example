@@ -4,7 +4,16 @@ from flask import Flask, render_template, request, redirect
 
 app = Flask(__name__)
 
-users = ['mike', 'mishel', 'adel', 'keks', 'kamila']
+
+def read_file(file_path):
+    with open(file_path, 'r') as input_file:
+        file_data = input_file.read()
+        return file_data
+
+
+def write_file(file_path, data):
+    with open(file_path, 'w') as file:
+        file.write(json.dumps(data, indent=2))
 
 
 @app.route('/')
@@ -12,27 +21,33 @@ def hello_world():
     return 'Welcome to Flask!'
 
 
-@app.get('/users')
+@app.route('/users', methods=['GET', 'POST'])
 def get_users():
-    result = users
-    search = request.args.get('term', '')
-    if search:
-        result = [user for user in users if search in user]
-    return render_template(
-        'users/index.html',
-        users=result,
-        search=search
-    )
+    data = read_file('templates/users/data.json')
 
+    if request.method == 'GET':
+        all_users= json.loads(data)['users']
+        search_query = request.args.get('term', '')
+        if search_query:
+            found_users = [user for user in all_users if search_query in user["nickname"]]
+            return render_template(
+                'users/index.html',
+                users=found_users,
+                search_query=search_query
+            )
+        return render_template(
+                'users/index.html',
+                users=all_users,
+                search_query=search_query
+            )
 
-@app.post('/users')
-def users_post():
-    user = request.form.to_dict()
-    if user:
+    if request.method == 'POST':
+        user = request.form.to_dict()
         user['id'] = str(uuid.uuid4())
-    with open('templates/users/data.json', 'w') as file:
-        json.dump(user, file)
-    return redirect('/users', 302)
+        users = json.loads(data)
+        users['users'].append(user)
+        write_file('templates/users/data.json', users)
+        return redirect('/users', 302)
 
 
 @app.route('/users/new')
